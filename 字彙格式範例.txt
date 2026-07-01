@@ -1,0 +1,17 @@
+{
+  "easy": [
+    {"word": "Hand", "meaning": "手"},
+    {"word": "Foot", "meaning": "腳"},
+    {"word": "Hair", "meaning": "頭髮"}
+  ],
+  "medium": [
+    {"word": "Recycle", "meaning": "回收"},
+    {"word": "Furniture", "meaning": "家具"},
+    {"word": "Medicine", "meaning": "藥物"}
+  ],
+  "hard": [
+   {"word": "Renovation", "meaning": "翻修/裝潢"},
+    {"word": "Aisle", "meaning": "走道/通道"},
+    {"word": "Cashier", "meaning": "收銀員"}
+  ]
+}

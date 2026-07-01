@@ -4,6 +4,8 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>互動式英文單字與口說練習</title>
+    <!-- 👇 這裡會自動載入同資料夾下的 vocab.js 檔案 -->
+    <script src="vocab.js"></script>
     <style>
         body {
             font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
@@ -124,7 +126,6 @@
             background-color: #e74c3c;
             color: white;
         }
-        /* 口說測驗專用樣式 */
         #speaking-container {
             background-color: #f8f9fa;
             border-radius: 8px;
@@ -182,12 +183,11 @@
     
     <div class="settings-panel" id="settings-panel">
         <div class="upload-section">
-            <label style="font-size: 14px; font-weight: bold; color: #2c3e50; display: block; margin-bottom: 10px;">📥 匯入字彙庫 (二選一)</label>
+            <div id="upload-message" style="margin-bottom:10px; font-size:14px; font-weight:bold;">正在檢查預設字庫...</div>
+            <label style="font-size: 14px; font-weight: bold; color: #2c3e50; display: block; margin-bottom: 10px; text-align: left;">📥 手動擴充字彙庫 (可選)</label>
             <input type="file" accept=".json" onchange="importFromFile(this)" style="font-size: 13px; width: 100%; margin-top: 0; margin-bottom: 10px;">
-            <div style="font-size: 13px; color: #e67e22; font-weight: bold; margin-bottom: 5px; text-align: left;">⚠️ 若檔案上傳卡住，請將 JSON 文字貼在下方：</div>
-            <textarea id="json-text" rows="3" style="width: 100%; box-sizing: border-box; padding: 5px;"></textarea>
-            <button onclick="importFromText()" style="margin-top: 5px; background-color: #27ae60; padding: 8px; font-size: 14px;">確認匯入上方文字</button>
-            <div id="upload-message" style="margin-top:10px; font-size:14px; font-weight:bold;"></div>
+            <textarea id="json-text" rows="2" style="width: 100%; box-sizing: border-box; padding: 5px;" placeholder="或在此貼上 JSON 擴充字庫"></textarea>
+            <button onclick="importFromText()" style="margin-top: 5px; background-color: #27ae60; padding: 8px; font-size: 14px;">確認擴充上方文字</button>
         </div>
 
         <label for="quiz-mode" style="display: block; margin-bottom: 5px; text-align: left; font-weight: bold;">選擇模式：</label>
@@ -215,10 +215,8 @@
         </div>
         <div id="word-meaning-display" style="display: none;"></div>
         
-        <!-- 選擇題區塊 -->
         <div class="options-grid" id="options-container"></div>
 
-        <!-- 口說測驗區塊 -->
         <div id="speaking-container" style="display: none;">
             <button id="mic-btn" onclick="startRecognition()" title="點擊開始錄音">🎙️</button>
             <div id="mic-status" style="font-size: 14px; color: #7f8c8d; margin-top: 10px; font-weight: bold;">點擊麥克風開始發音</div>
@@ -232,27 +230,44 @@
 </div>
 
 <script>
-    const vocabulary = {
+    // 預設的保底字庫（萬一 vocab.js 沒讀到，程式還是能跑）
+    let vocabulary = {
         easy: [ { word: "Apple", meaning: "蘋果" }, { word: "Water", meaning: "水" }, { word: "House", meaning: "房子" }, { word: "Happy", meaning: "快樂的" } ],
         medium: [ { word: "Diligent", meaning: "勤勉的" }, { word: "Observe", meaning: "觀察" }, { word: "Hesitate", meaning: "猶豫" }, { word: "Benefit", meaning: "利益/好處" } ],
         hard: [ { word: "Ubiquitous", meaning: "無所不在的" }, { word: "Ephemeral", meaning: "短暫的" }, { word: "Paradigm", meaning: "範例/典範" }, { word: "Serendipity", meaning: "機緣巧合" } ]
     };
 
+    // 👇 網頁載入完成後，自動讀取 vocab.js 裡面的字庫
+    window.onload = function() {
+        const messageBox = document.getElementById("upload-message");
+        if (typeof autoVocab !== 'undefined') {
+            // 如果成功抓到外部檔案的 autoVocab，就覆蓋掉保底字庫
+            vocabulary = autoVocab;
+            let totalWords = (vocabulary.easy?.length || 0) + (vocabulary.medium?.length || 0) + (vocabulary.hard?.length || 0);
+            messageBox.innerText = `✅ 預設字庫已自動載入！(共 ${totalWords} 字)`;
+            messageBox.style.color = "#2ecc71";
+        } else {
+            messageBox.innerText = "⚠️ 未偵測到外部字庫，目前使用體驗版單字。";
+            messageBox.style.color = "#e67e22";
+        }
+    };
+
     let currentDifficulty = [];
     let currentWord = {};
     let score = 0;
-    let isQuestionAnswered = false; // 防止重複計分
+    let isQuestionAnswered = false;
     let currentMode = 'choice';
 
-    // === 語音辨識 (Speech Recognition) 設定 ===
+    // === 語音辨識設定 (含連續模式) ===
     const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
     let recognition;
 
     if (SpeechRecognition) {
         recognition = new SpeechRecognition();
-        recognition.lang = 'en-US'; // 辨識語言設為美式英文
+        recognition.lang = 'en-US'; 
         recognition.interimResults = false;
         recognition.maxAlternatives = 1;
+        recognition.continuous = true; // 開啟連續聆聽，免除一直按允許的困擾
 
         recognition.onstart = function() {
             const micBtn = document.getElementById("mic-btn");
@@ -262,14 +277,12 @@
             micStatus.style.color = "#e67e22";
             document.getElementById("recognized-text").innerText = "";
             document.getElementById("feedback").innerText = "";
-            
-            // 確保系統 TTS 停止，以免麥克風收到電腦發出的聲音
             if ('speechSynthesis' in window) window.speechSynthesis.cancel();
         };
 
         recognition.onresult = function(event) {
-            // 取得辨識結果，轉小寫並清除標點符號以便比對
-            const speechResult = event.results[0][0].transcript.toLowerCase().replace(/[.,!?]/g, '').trim();
+            const lastIndex = event.results.length - 1;
+            const speechResult = event.results[lastIndex][0].transcript.toLowerCase().replace(/[.,!?]/g, '').trim();
             const targetWord = currentWord.word.toLowerCase().replace(/[.,!?]/g, '').trim();
             
             document.getElementById("recognized-text").innerHTML = `你說了：<span style="color:#e74c3c;">"${speechResult}"</span>`;
@@ -278,7 +291,7 @@
 
         recognition.onerror = function(event) {
             const micStatus = document.getElementById("mic-status");
-            micStatus.innerText = "❌ 沒聽清楚或麥克風無反應，請再試一次";
+            micStatus.innerText = "❌ 沒聽清楚，請再試一次";
             micStatus.style.color = "#e74c3c";
             document.getElementById("mic-btn").classList.remove("listening");
         };
@@ -295,13 +308,12 @@
 
     function startRecognition() {
         if (!recognition) {
-            alert("⚠️ 您的瀏覽器不支援語音辨識！請使用最新版的 Google Chrome 或 Edge 瀏覽器。");
+            alert("⚠️ 您的瀏覽器不支援語音辨識！");
             return;
         }
         recognition.start();
     }
 
-    // === TTS 發音功能 ===
     function speakCurrentWord() {
         if (!currentWord.word) return;
         if ('speechSynthesis' in window) {
@@ -313,11 +325,10 @@
         }
     }
 
-    // === 匯入 JSON 功能 ===
     function processJSON(fileText) {
         const messageBox = document.getElementById("upload-message");
         try {
-            const match = fileText.match(/\[[\s\S]*\]|\{[\s\S]*\}/); // 支援 Array 或 Object
+            const match = fileText.match(/\[[\s\S]*\]|\{[\s\S]*\}/);
             if (match) fileText = match[0];
             const importedData = JSON.parse(fileText);
             
@@ -330,7 +341,7 @@
                 vocabulary.easy.push(...importedData.easy);
                 vocabulary.medium.push(...importedData.medium);
                 vocabulary.hard.push(...importedData.hard);
-                let totalWords = vocabulary.easy.length + vocabulary.medium.length + vocabulary.hard.length;
+                let totalWords = (vocabulary.easy?.length || 0) + (vocabulary.medium?.length || 0) + (vocabulary.hard?.length || 0);
                 messageBox.innerText = `✅ 字彙庫擴充成功！目前共 ${totalWords} 個單字。`;
                 messageBox.style.color = "#2ecc71";
             } else {
@@ -359,7 +370,6 @@
         textArea.value = ""; 
     }
 
-    // === 測驗邏輯 ===
     function startQuiz() {
         const difficultyLevel = document.getElementById("difficulty").value;
         currentMode = document.getElementById("quiz-mode").value;
@@ -377,7 +387,6 @@
         updateScore();
         document.getElementById("settings-panel").style.display = "none";
         document.getElementById("quiz-panel").style.display = "block";
-        document.getElementById("upload-message").innerText = ""; 
         nextQuestion();
     }
 
@@ -386,7 +395,6 @@
         document.getElementById("quiz-panel").style.display = "none";
         document.getElementById("feedback").innerText = "";
         document.getElementById("next-btn").style.display = "none";
-        // 確保離開時關閉麥克風
         if(recognition) recognition.stop();
     }
 
@@ -404,14 +412,12 @@
         const speakingContainer = document.getElementById("speaking-container");
 
         if (currentMode === 'choice') {
-            // 選擇題模式 UI
             meaningDisplay.style.display = "none";
             optionsContainer.style.display = "grid";
             speakingContainer.style.display = "none";
             generateOptions();
             speakCurrentWord();
         } else {
-            // 口說測驗模式 UI
             meaningDisplay.style.display = "block";
             meaningDisplay.innerText = `中文意思：${currentWord.meaning}`;
             optionsContainer.style.display = "none";
@@ -421,12 +427,9 @@
             document.getElementById("mic-status").innerText = "點擊麥克風開始發音";
             document.getElementById("mic-status").style.color = "#7f8c8d";
             document.getElementById("recognized-text").innerText = "";
-            
-            // 提示：口說測驗不主動發音，讓使用者自己先試著唸
         }
     }
 
-    // --- 選擇題模式比對 ---
     function generateOptions() {
         const optionsContainer = document.getElementById("options-container");
         optionsContainer.innerHTML = ""; 
@@ -441,7 +444,7 @@
             }
         }
 
-        options.sort(() => Math.random() - 0.5); // 隨機打亂
+        options.sort(() => Math.random() - 0.5); 
 
         options.forEach(optionText => {
             const btn = document.createElement("button");
@@ -476,17 +479,15 @@
         document.getElementById("next-btn").style.display = "inline-block";
     }
 
-    // --- 口說測驗模式比對 ---
     function checkSpeakingAnswer(spoken, target) {
         const feedback = document.getElementById("feedback");
         document.getElementById("mic-status").innerText = "辨識完成";
         document.getElementById("mic-status").style.color = "#3498db";
         
-        // 寬鬆比對：完全相同，或是字串包含 (避免語音 API 自帶標點或大小寫干擾)
         if (spoken === target || spoken.includes(target) || target.includes(spoken)) {
             feedback.innerText = "✅ 發音非常標準！";
             feedback.style.color = "#2ecc71";
-            document.getElementById("mic-btn").disabled = true; // 答對即鎖定麥克風
+            document.getElementById("mic-btn").disabled = true; 
             
             if (!isQuestionAnswered) {
                 score += 10;
@@ -496,7 +497,7 @@
         } else {
             feedback.innerText = `❌ 發音不太對喔！建議點擊上方 🔊 聆聽`;
             feedback.style.color = "#e74c3c";
-            isQuestionAnswered = true; // 答錯一次後就不給分，但允許無限次重新點擊麥克風練習
+            isQuestionAnswered = true; 
         }
         
         document.getElementById("next-btn").style.display = "inline-block";
