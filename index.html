@@ -4,7 +4,6 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>互動式英文單字與口說練習</title>
-    <!-- 👇 這裡會自動載入同資料夾下的 vocab.js 檔案 -->
     <script src="vocab.js"></script>
     <style>
         body {
@@ -196,12 +195,8 @@
             <option value="speak">🎤 口說測驗模式 (Speaking Test)</option>
         </select>
 
-        <label for="difficulty" style="display: block; margin-bottom: 5px; text-align: left; font-weight: bold;">選擇難度：</label>
-        <select id="difficulty" style="margin-top: 0;">
-            <option value="easy">簡單 (Easy)</option>
-            <option value="medium">中等 (Medium)</option>
-            <option value="hard">困難 (Hard)</option>
-        </select>
+        <label for="difficulty" style="display: block; margin-bottom: 5px; text-align: left; font-weight: bold;">選擇分類/難度：</label>
+        <select id="difficulty" style="margin-top: 0;"></select>
         
         <button onclick="startQuiz()" style="margin-top: 20px; padding: 12px; font-weight: bold;">開始練習</button>
     </div>
@@ -230,26 +225,65 @@
 </div>
 
 <script>
-    // 預設的保底字庫（萬一 vocab.js 沒讀到，程式還是能跑）
     let vocabulary = {
         easy: [ { word: "Apple", meaning: "蘋果" }, { word: "Water", meaning: "水" }, { word: "House", meaning: "房子" }, { word: "Happy", meaning: "快樂的" } ],
         medium: [ { word: "Diligent", meaning: "勤勉的" }, { word: "Observe", meaning: "觀察" }, { word: "Hesitate", meaning: "猶豫" }, { word: "Benefit", meaning: "利益/好處" } ],
         hard: [ { word: "Ubiquitous", meaning: "無所不在的" }, { word: "Ephemeral", meaning: "短暫的" }, { word: "Paradigm", meaning: "範例/典範" }, { word: "Serendipity", meaning: "機緣巧合" } ]
     };
 
-    // 👇 網頁載入完成後，自動讀取 vocab.js 裡面的字庫
+    // --- 動態更新難度選單的功能 ---
+    function updateDifficultyOptions() {
+        const selectElement = document.getElementById("difficulty");
+        selectElement.innerHTML = ''; // 清空舊選項
+
+        // 1. 永遠加入「不分類 (全部單字)」的選項
+        let totalWords = 0;
+        for(let key in vocabulary) {
+            if(Array.isArray(vocabulary[key])) totalWords += vocabulary[key].length;
+        }
+        
+        const allOption = document.createElement("option");
+        allOption.value = "all";
+        allOption.innerText = `⭐ 不分類 / 全部字彙 (${totalWords}字)`;
+        selectElement.appendChild(allOption);
+
+        // 2. 檢查 vocabulary 裡面的所有 key，如果有字才加入選單
+        for (const key in vocabulary) {
+            if (vocabulary.hasOwnProperty(key) && Array.isArray(vocabulary[key]) && vocabulary[key].length > 0) {
+                const opt = document.createElement("option");
+                opt.value = key;
+                
+                // 幫常見的分類換成漂亮的中文，其他的則首字母大寫顯示
+                let displayName = key;
+                if (key === 'easy') displayName = '簡單 (Easy)';
+                else if (key === 'medium') displayName = '中等 (Medium)';
+                else if (key === 'hard') displayName = '困難 (Hard)';
+                else if (key === 'custom') displayName = '自訂匯入 (Custom)';
+                else if (key === 'basic') displayName = '基礎 (Basic)';
+                else if (key === 'elementary') displayName = '全民英檢初級';
+                else if (key === 'intermediate') displayName = '全民英檢中級';
+                else if (key === 'high-intermediate') displayName = '全民英檢中高級';
+                else displayName = key.charAt(0).toUpperCase() + key.slice(1);
+                
+                opt.innerText = `🔹 ${displayName} (${vocabulary[key].length}字)`;
+                selectElement.appendChild(opt);
+            }
+        }
+    }
+
+    // --- 網頁載入完成後的動作 ---
     window.onload = function() {
         const messageBox = document.getElementById("upload-message");
         if (typeof autoVocab !== 'undefined') {
-            // 如果成功抓到外部檔案的 autoVocab，就覆蓋掉保底字庫
             vocabulary = autoVocab;
-            let totalWords = (vocabulary.easy?.length || 0) + (vocabulary.medium?.length || 0) + (vocabulary.hard?.length || 0);
-            messageBox.innerText = `✅ 預設字庫已自動載入！(共 ${totalWords} 字)`;
+            messageBox.innerText = `✅ 預設字庫已自動載入！`;
             messageBox.style.color = "#2ecc71";
         } else {
             messageBox.innerText = "⚠️ 未偵測到外部字庫，目前使用體驗版單字。";
             messageBox.style.color = "#e67e22";
         }
+        // 載入字庫後，立刻刷新選單
+        updateDifficultyOptions(); 
     };
 
     let currentDifficulty = [];
@@ -267,7 +301,7 @@
         recognition.lang = 'en-US'; 
         recognition.interimResults = false;
         recognition.maxAlternatives = 1;
-        recognition.continuous = true; // 開啟連續聆聽，免除一直按允許的困擾
+        recognition.continuous = true; 
 
         recognition.onstart = function() {
             const micBtn = document.getElementById("mic-btn");
@@ -325,6 +359,7 @@
         }
     }
 
+    // --- 增強版的 JSON 解析邏輯 ---
     function processJSON(fileText) {
         const messageBox = document.getElementById("upload-message");
         try {
@@ -332,20 +367,31 @@
             if (match) fileText = match[0];
             const importedData = JSON.parse(fileText);
             
+            let addedCount = 0;
+
+            // 如果上傳的是一個單純的陣列 (例如 Python 剛轉出來的格式)，自動放入 custom 分類
             if (Array.isArray(importedData)) {
-                alert("如果您匯入的是純陣列格式，請透過程式碼手動將其分配到 vocabulary 的對應難度中。");
-                return;
+                if (!vocabulary['custom']) vocabulary['custom'] = [];
+                vocabulary['custom'].push(...importedData);
+                addedCount += importedData.length;
+            } 
+            // 如果上傳的是包含自訂分類名稱的物件
+            else {
+                for (const key in importedData) {
+                    if (importedData.hasOwnProperty(key) && Array.isArray(importedData[key])) {
+                        if (!vocabulary[key]) vocabulary[key] = []; // 如果原字庫沒有這個分類，就建立它
+                        vocabulary[key].push(...importedData[key]);
+                        addedCount += importedData[key].length;
+                    }
+                }
             }
 
-            if (importedData.easy && importedData.medium && importedData.hard) {
-                vocabulary.easy.push(...importedData.easy);
-                vocabulary.medium.push(...importedData.medium);
-                vocabulary.hard.push(...importedData.hard);
-                let totalWords = (vocabulary.easy?.length || 0) + (vocabulary.medium?.length || 0) + (vocabulary.hard?.length || 0);
-                messageBox.innerText = `✅ 字彙庫擴充成功！目前共 ${totalWords} 個單字。`;
+            if (addedCount > 0) {
+                messageBox.innerText = `✅ 字彙庫擴充成功！新增了 ${addedCount} 個單字。`;
                 messageBox.style.color = "#2ecc71";
+                updateDifficultyOptions(); // 擴充字庫後，立刻刷新選單！
             } else {
-                messageBox.innerText = "❌ 格式不符！檔案內缺少 easy, medium, hard。";
+                messageBox.innerText = "❌ 格式不符！找不到有效的單字陣列。";
                 messageBox.style.color = "#e74c3c";
             }
         } catch (error) {
@@ -370,16 +416,28 @@
         textArea.value = ""; 
     }
 
+    // --- 修改後的開始測驗邏輯 ---
     function startQuiz() {
         const difficultyLevel = document.getElementById("difficulty").value;
         currentMode = document.getElementById("quiz-mode").value;
-        currentDifficulty = [...vocabulary[difficultyLevel]]; 
+        currentDifficulty = [];
+
+        // 判斷是否選擇了「不分類(全部)」
+        if (difficultyLevel === 'all') {
+            for (const key in vocabulary) {
+                if (Array.isArray(vocabulary[key])) {
+                    currentDifficulty.push(...vocabulary[key]);
+                }
+            }
+        } else {
+            currentDifficulty = [...(vocabulary[difficultyLevel] || [])];
+        }
         
         if (currentMode === 'choice' && currentDifficulty.length < 4) {
-            alert("⚠️ 選擇題模式下，該難度單字數量不足 4 個，請匯入更多單字或選擇口說測驗！");
+            alert("⚠️ 選擇題模式下，該分類單字數量不足 4 個，請匯入更多單字或選擇口說測驗！");
             return;
         } else if (currentDifficulty.length === 0) {
-            alert("⚠️ 該難度沒有單字！");
+            alert("⚠️ 該分類沒有單字！");
             return;
         }
 
