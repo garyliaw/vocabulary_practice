@@ -12,9 +12,22 @@
             display: flex;
             justify-content: center;
             align-items: center;
-            height: 100vh;
+            min-height: 100vh;
             margin: 0;
+            padding: 20px;
+            box-sizing: border-box;
         }
+        
+        /* 全新的雙面板排版容器 */
+        .layout-wrapper {
+            display: flex;
+            gap: 20px;
+            width: 100%;
+            max-width: 800px;
+            justify-content: center;
+            align-items: flex-start;
+        }
+
         .container {
             background-color: white;
             padding: 30px;
@@ -23,9 +36,50 @@
             width: 100%;
             max-width: 400px;
             text-align: center;
-            max-height: 90vh;
+            max-height: 85vh;
             overflow-y: auto;
         }
+        
+        /* 練習紀錄專屬面板樣式 */
+        .history-panel {
+            max-width: 350px;
+            display: none; /* 預設隱藏，測驗開始時才顯示 */
+        }
+        .history-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 12px 10px;
+            border-bottom: 1px solid #f1f2f6;
+            text-align: left;
+        }
+        .history-item:last-child {
+            border-bottom: none;
+        }
+        .history-word {
+            font-weight: bold;
+            font-size: 16px;
+        }
+        .history-meaning {
+            font-size: 13px;
+            color: #7f8c8d;
+            margin-top: 4px;
+        }
+        .history-status {
+            font-size: 18px;
+        }
+
+        /* 手機版直式排版 */
+        @media (max-width: 768px) {
+            .layout-wrapper {
+                flex-direction: column;
+                align-items: center;
+            }
+            .history-panel {
+                max-width: 400px;
+            }
+        }
+
         h1 {
             color: #2c3e50;
             font-size: 24px;
@@ -173,7 +227,8 @@
             font-family: monospace;
             resize: vertical;
         }
-/* 版權宣告的 UI 設計 */
+
+        /* 版權宣告的 UI 設計 */
         .copyright-notice {
             position: fixed;
             bottom: 15px;
@@ -201,66 +256,79 @@
 </head>
 <body>
 
-<div class="container">
-    <h1>📝 英文單字小測驗</h1>
-    
-    <div class="settings-panel" id="settings-panel">
-        <div class="upload-section">
-            <div id="upload-message" style="margin-bottom:10px; font-size:14px; font-weight:bold;">正在檢查預設字庫...</div>
-            <label style="font-size: 14px; font-weight: bold; color: #2c3e50; display: block; margin-bottom: 10px; text-align: left;">📥 手動擴充字彙庫 (可選)</label>
-            <input type="file" accept=".json" onchange="importFromFile(this)" style="font-size: 13px; width: 100%; margin-top: 0; margin-bottom: 10px;">
-            <textarea id="json-text" rows="2" style="width: 100%; box-sizing: border-box; padding: 5px;" placeholder="或在此貼上 JSON 擴充字庫"></textarea>
-            <button onclick="importFromText()" style="margin-top: 5px; background-color: #27ae60; padding: 8px; font-size: 14px;">確認擴充上方文字</button>
+<div class="layout-wrapper">
+    <div class="container main-content">
+        <h1>📝 英文單字小測驗</h1>
+        
+        <div class="settings-panel" id="settings-panel">
+            <div class="upload-section">
+                <div id="upload-message" style="margin-bottom:10px; font-size:14px; font-weight:bold;">正在檢查預設字庫...</div>
+                <label style="font-size: 14px; font-weight: bold; color: #2c3e50; display: block; margin-bottom: 10px; text-align: left;">📥 手動擴充字彙庫 (可選)</label>
+                <input type="file" accept=".json" onchange="importFromFile(this)" style="font-size: 13px; width: 100%; margin-top: 0; margin-bottom: 10px;">
+                <textarea id="json-text" rows="2" style="width: 100%; box-sizing: border-box; padding: 5px;" placeholder="或在此貼上 JSON 擴充字庫"></textarea>
+                <button onclick="importFromText()" style="margin-top: 5px; background-color: #27ae60; padding: 8px; font-size: 14px;">確認擴充上方文字</button>
+            </div>
+
+            <label for="quiz-mode" style="display: block; margin-bottom: 5px; text-align: left; font-weight: bold;">選擇模式：</label>
+            <select id="quiz-mode" style="margin-top: 0; margin-bottom: 15px;">
+                <option value="choice">🔘 選擇題模式 (Multiple Choice)</option>
+                <option value="speak">🎤 口說測驗模式 (Speaking Test)</option>
+            </select>
+
+            <label for="difficulty" style="display: block; margin-bottom: 5px; text-align: left; font-weight: bold;">選擇分類/難度：</label>
+            <select id="difficulty" style="margin-top: 0;"></select>
+            
+            <button onclick="startQuiz()" style="margin-top: 20px; padding: 12px; font-weight: bold;">開始練習</button>
         </div>
 
-        <label for="quiz-mode" style="display: block; margin-bottom: 5px; text-align: left; font-weight: bold;">選擇模式：</label>
-        <select id="quiz-mode" style="margin-top: 0; margin-bottom: 15px;">
-            <option value="choice">🔘 選擇題模式 (Multiple Choice)</option>
-            <option value="speak">🎤 口說測驗模式 (Speaking Test)</option>
-        </select>
+        <div class="quiz-panel" id="quiz-panel">
+            <div class="score-display">分數: <span id="score">0</span></div>
+            
+            <div class="word-row">
+                <div id="word-display">Word</div>
+                <button id="speak-btn" onclick="speakCurrentWord()" title="聆聽標準發音">🔊</button>
+            </div>
+            <div id="word-meaning-display" style="display: none;"></div>
+            
+            <div class="options-grid" id="options-container"></div>
 
-        <label for="difficulty" style="display: block; margin-bottom: 5px; text-align: left; font-weight: bold;">選擇分類/難度：</label>
-        <select id="difficulty" style="margin-top: 0;"></select>
-        
-        <button onclick="startQuiz()" style="margin-top: 20px; padding: 12px; font-weight: bold;">開始練習</button>
+            <div id="speaking-container" style="display: none;">
+                <button id="mic-btn" onclick="startRecognition()" title="點擊開始錄音">🎙️</button>
+                <div id="mic-status" style="font-size: 14px; color: #7f8c8d; margin-top: 10px; font-weight: bold;">點擊麥克風開始發音</div>
+                <div id="recognized-text" style="font-size: 15px; color: #2c3e50; margin-top: 10px; min-height: 22px;"></div>
+            </div>
+
+            <div id="feedback"></div>
+            <button id="next-btn" style="display: none; background-color: #27ae60;" onclick="nextQuestion()">下一題 ➔</button>
+            <button onclick="endQuiz()" style="background-color: #95a5a6; margin-top: 10px;">結束並返回設定</button>
+        </div>
     </div>
 
-    <div class="quiz-panel" id="quiz-panel">
-        <div class="score-display">分數: <span id="score">0</span></div>
-        
-        <div class="word-row">
-            <div id="word-display">Word</div>
-            <button id="speak-btn" onclick="speakCurrentWord()" title="聆聽標準發音">🔊</button>
-        </div>
-        <div id="word-meaning-display" style="display: none;"></div>
-        
-        <div class="options-grid" id="options-container"></div>
-
-        <div id="speaking-container" style="display: none;">
-            <button id="mic-btn" onclick="startRecognition()" title="點擊開始錄音">🎙️</button>
-            <div id="mic-status" style="font-size: 14px; color: #7f8c8d; margin-top: 10px; font-weight: bold;">點擊麥克風開始發音</div>
-            <div id="recognized-text" style="font-size: 15px; color: #2c3e50; margin-top: 10px; min-height: 22px;"></div>
-        </div>
-
-        <div id="feedback"></div>
-        <button id="next-btn" style="display: none; background-color: #27ae60;" onclick="nextQuestion()">下一題 ➔</button>
-        <button onclick="endQuiz()" style="background-color: #95a5a6; margin-top: 10px;">結束並返回設定</button>
+    <div class="container history-panel" id="history-panel">
+        <h3 style="margin-top: 0; color: #2c3e50; border-bottom: 2px solid #ecf0f1; padding-bottom: 10px;">📋 本次練習紀錄</h3>
+        <div id="history-list">
+            </div>
     </div>
+</div>
+
+<div class="copyright-notice">
+    &copy; 2026 量子資訊有限公司. All rights reserved. <br>
+    <span style="font-size: 11px; color: #bdc3c7; margin-top: 4px; display: inline-block;">
+        Powered by Web Speech API
+    </span>
 </div>
 
 <script>
     let vocabulary = {
-        easy: [ { word: "Apple", meaning: "蘋果" }, { word: "Water", meaning: "水" }, { word: "House", meaning: "房子" }, { word: "Happy", meaning: "快樂的" } ],
-        medium: [ { word: "Diligent", meaning: "勤勉的" }, { word: "Observe", meaning: "觀察" }, { word: "Hesitate", meaning: "猶豫" }, { word: "Benefit", meaning: "利益/好處" } ],
-        hard: [ { word: "Ubiquitous", meaning: "無所不在的" }, { word: "Ephemeral", meaning: "短暫的" }, { word: "Paradigm", meaning: "範例/典範" }, { word: "Serendipity", meaning: "機緣巧合" } ]
+        easy: [ { word: "Apple", meaning: "蘋果" }, { word: "Water", meaning: "水" }, { word: "House", meaning: "房子" } ],
+        medium: [ { word: "Diligent", meaning: "勤勉的" }, { word: "Observe", meaning: "觀察" }, { word: "Hesitate", meaning: "猶豫" } ],
+        hard: [ { word: "Ubiquitous", meaning: "無所不在的" }, { word: "Ephemeral", meaning: "短暫的" }, { word: "Paradigm", meaning: "範例/典範" } ]
     };
 
-    // --- 動態更新難度選單的功能 ---
     function updateDifficultyOptions() {
         const selectElement = document.getElementById("difficulty");
-        selectElement.innerHTML = ''; // 清空舊選項
+        selectElement.innerHTML = ''; 
 
-        // 1. 永遠加入「不分類 (全部單字)」的選項
         let totalWords = 0;
         for(let key in vocabulary) {
             if(Array.isArray(vocabulary[key])) totalWords += vocabulary[key].length;
@@ -271,23 +339,17 @@
         allOption.innerText = `⭐ 不分類 / 全部字彙 (${totalWords}字)`;
         selectElement.appendChild(allOption);
 
-        // 2. 檢查 vocabulary 裡面的所有 key，如果有字才加入選單
         for (const key in vocabulary) {
             if (vocabulary.hasOwnProperty(key) && Array.isArray(vocabulary[key]) && vocabulary[key].length > 0) {
                 const opt = document.createElement("option");
                 opt.value = key;
                 
-                // 幫常見的分類換成漂亮的中文，其他的則首字母大寫顯示
                 let displayName = key;
                 if (key === 'easy') displayName = '簡單 (Easy)';
                 else if (key === 'medium') displayName = '中等 (Medium)';
                 else if (key === 'hard') displayName = '困難 (Hard)';
                 else if (key === 'custom') displayName = '自訂匯入 (Custom)';
-                else if (key === 'basic') displayName = '基礎 (Basic)';
-                else if (key === 'elementary') displayName = '全民英檢初級';
-                else if (key === 'intermediate') displayName = '全民英檢中級';
-                else if (key === 'high-intermediate') displayName = '全民英檢中高級';
-                else displayName = key.charAt(0).toUpperCase() + key.slice(1);
+                else displayName = key; 
                 
                 opt.innerText = `🔹 ${displayName} (${vocabulary[key].length}字)`;
                 selectElement.appendChild(opt);
@@ -295,7 +357,6 @@
         }
     }
 
-    // --- 網頁載入完成後的動作 ---
     window.onload = function() {
         const messageBox = document.getElementById("upload-message");
         if (typeof autoVocab !== 'undefined') {
@@ -306,7 +367,6 @@
             messageBox.innerText = "⚠️ 未偵測到外部字庫，目前使用體驗版單字。";
             messageBox.style.color = "#e67e22";
         }
-        // 載入字庫後，立刻刷新選單
         updateDifficultyOptions(); 
     };
 
@@ -316,7 +376,6 @@
     let isQuestionAnswered = false;
     let currentMode = 'choice';
 
-    // === 語音辨識設定 (含連續模式) ===
     const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
     let recognition;
 
@@ -383,7 +442,6 @@
         }
     }
 
-    // --- 增強版的 JSON 解析邏輯 ---
     function processJSON(fileText) {
         const messageBox = document.getElementById("upload-message");
         try {
@@ -393,17 +451,14 @@
             
             let addedCount = 0;
 
-            // 如果上傳的是一個單純的陣列 (例如 Python 剛轉出來的格式)，自動放入 custom 分類
             if (Array.isArray(importedData)) {
                 if (!vocabulary['custom']) vocabulary['custom'] = [];
                 vocabulary['custom'].push(...importedData);
                 addedCount += importedData.length;
-            } 
-            // 如果上傳的是包含自訂分類名稱的物件
-            else {
+            } else {
                 for (const key in importedData) {
                     if (importedData.hasOwnProperty(key) && Array.isArray(importedData[key])) {
-                        if (!vocabulary[key]) vocabulary[key] = []; // 如果原字庫沒有這個分類，就建立它
+                        if (!vocabulary[key]) vocabulary[key] = [];
                         vocabulary[key].push(...importedData[key]);
                         addedCount += importedData[key].length;
                     }
@@ -413,7 +468,7 @@
             if (addedCount > 0) {
                 messageBox.innerText = `✅ 字彙庫擴充成功！新增了 ${addedCount} 個單字。`;
                 messageBox.style.color = "#2ecc71";
-                updateDifficultyOptions(); // 擴充字庫後，立刻刷新選單！
+                updateDifficultyOptions(); 
             } else {
                 messageBox.innerText = "❌ 格式不符！找不到有效的單字陣列。";
                 messageBox.style.color = "#e74c3c";
@@ -440,18 +495,34 @@
         textArea.value = ""; 
     }
 
-    // --- 修改後的開始測驗邏輯 ---
+    // 將練習紀錄加入右側面板
+    function addHistoryItem(word, meaning, isCorrect) {
+        const historyList = document.getElementById("history-list");
+        const item = document.createElement("div");
+        item.className = "history-item";
+        
+        const icon = isCorrect ? "✅" : "❌";
+        const wordColor = isCorrect ? "#2ecc71" : "#e74c3c";
+        
+        item.innerHTML = `
+            <div>
+                <div class="history-word" style="color: ${wordColor};">${word}</div>
+                <div class="history-meaning">${meaning}</div>
+            </div>
+            <div class="history-status">${icon}</div>
+        `;
+        
+        historyList.insertBefore(item, historyList.firstChild);
+    }
+
     function startQuiz() {
         const difficultyLevel = document.getElementById("difficulty").value;
         currentMode = document.getElementById("quiz-mode").value;
         currentDifficulty = [];
 
-        // 判斷是否選擇了「不分類(全部)」
         if (difficultyLevel === 'all') {
             for (const key in vocabulary) {
-                if (Array.isArray(vocabulary[key])) {
-                    currentDifficulty.push(...vocabulary[key]);
-                }
+                if (Array.isArray(vocabulary[key])) currentDifficulty.push(...vocabulary[key]);
             }
         } else {
             currentDifficulty = [...(vocabulary[difficultyLevel] || [])];
@@ -467,14 +538,20 @@
 
         score = 0;
         updateScore();
+        
         document.getElementById("settings-panel").style.display = "none";
         document.getElementById("quiz-panel").style.display = "block";
+        document.getElementById("history-panel").style.display = "block";
+        
+        document.getElementById("history-list").innerHTML = "";
+        
         nextQuestion();
     }
 
     function endQuiz() {
         document.getElementById("settings-panel").style.display = "block";
         document.getElementById("quiz-panel").style.display = "none";
+        document.getElementById("history-panel").style.display = "none";
         document.getElementById("feedback").innerText = "";
         document.getElementById("next-btn").style.display = "none";
         if(recognition) recognition.stop();
@@ -525,9 +602,7 @@
                 tempVocab.splice(randomWrongIndex, 1); 
             }
         }
-
         options.sort(() => Math.random() - 0.5); 
-
         options.forEach(optionText => {
             const btn = document.createElement("button");
             btn.className = "option-btn";
@@ -545,7 +620,10 @@
         allBtns.forEach(b => b.disabled = true);
         const feedback = document.getElementById("feedback");
 
-        if (selectedMeaning === currentWord.meaning) {
+        let isCorrect = (selectedMeaning === currentWord.meaning);
+        addHistoryItem(currentWord.word, currentWord.meaning, isCorrect);
+
+        if (isCorrect) {
             btn.classList.add("correct");
             feedback.innerText = "✅ 答對了！";
             feedback.style.color = "#2ecc71";
@@ -566,7 +644,9 @@
         document.getElementById("mic-status").innerText = "辨識完成";
         document.getElementById("mic-status").style.color = "#3498db";
         
-        if (spoken === target || spoken.includes(target) || target.includes(spoken)) {
+        let isCorrect = (spoken === target || spoken.includes(target) || target.includes(spoken));
+
+        if (isCorrect) {
             feedback.innerText = "✅ 發音非常標準！";
             feedback.style.color = "#2ecc71";
             document.getElementById("mic-btn").disabled = true; 
@@ -574,12 +654,17 @@
             if (!isQuestionAnswered) {
                 score += 10;
                 updateScore();
+                addHistoryItem(currentWord.word, currentWord.meaning, true); 
                 isQuestionAnswered = true;
             }
         } else {
             feedback.innerText = `❌ 發音不太對喔！建議點擊上方 🔊 聆聽`;
             feedback.style.color = "#e74c3c";
-            isQuestionAnswered = true; 
+            
+            if (!isQuestionAnswered) {
+                addHistoryItem(currentWord.word, currentWord.meaning, false); 
+                isQuestionAnswered = true; 
+            }
         }
         
         document.getElementById("next-btn").style.display = "inline-block";
@@ -589,11 +674,6 @@
         document.getElementById("score").innerText = score;
     }
 </script>
-<div class="copyright-notice">
-    &copy; 2026 量子資訊有限公司. All rights reserved. <br>
-    <span style="font-size: 11px; color: #bdc3c7; margin-top: 4px; display: inline-block;">
-        Powered by Web Speech API
-    </span>
-</div>
+
 </body>
 </html>
